@@ -13,7 +13,8 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
     public class AdapterWithErrorHandler : BotFrameworkHttpAdapter
     {
         public AdapterWithErrorHandler(IConfiguration configuration, ILogger<BotFrameworkHttpAdapter> logger)
-            : base(configuration, logger)
+            //: base(configuration, logger)
+                : base(new Bot.Connector.Authentication.SimpleCredentialProvider("2ea52b84-e497-4bcb-8b5d-9670b57c2915", "-a6Sd~nx~a8vXs3Z820L_t9m3JluvFVl1-"), logger: logger)
         {
             OnTurnError = async (turnContext, exception) =>
             {
