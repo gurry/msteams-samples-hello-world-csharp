@@ -27,20 +27,26 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 if (parts.Length != 2)
                 {
                     var replyText = "Wrong syntax. Try \"device <device FQDN>\"";
-                    await turnContext.SendActivityAsync(MessageFactory.Text(replyText, replyText), cancellationToken);
+                    await turnContext.SendActivityAsync(MessageFactory.Text(replyText), cancellationToken);
                     return;
                 }
 
                 var fqdn = parts[1];
-                await turnContext.SendActivityAsync(MessageFactory.Text($"Here's the information about {fqdn}:"), cancellationToken);
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Here's the information about {fqdn} from Tachyon:"), cancellationToken);
                 var attachment = CreateDeviceCard(fqdn);
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(attachment), cancellationToken);
-
             }
-            else
+            else if (text.StartsWith("inst "))
             {
-                var replyText = $"You said: {text}";
-                await turnContext.SendActivityAsync(MessageFactory.Text(replyText, replyText), cancellationToken);
+                var parts = text.Split();
+                if (parts.Length != 2)
+                {
+                    var replyText = "Wrong syntax. Try \"inst <instruction text>\"";
+                    await turnContext.SendActivityAsync(MessageFactory.Text(replyText), cancellationToken);
+                    return;
+                }
+
+                await turnContext.SendActivityAsync(MessageFactory.Text("Instruction result:"), cancellationToken);
             }
         }
 
