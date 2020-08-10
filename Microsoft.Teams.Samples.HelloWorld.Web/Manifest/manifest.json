@@ -44,13 +44,45 @@
   ],
   "bots": [
     {
-      "botId": "2ea52b84-e497-4bcb-8b5d-9670b57c2915",
-      "needsChannelSelector": false,
-      "isNotificationOnly": false,
-      "scopes": [
-        "team",
-        "personal"
-      ]
+        "botId": "2ea52b84-e497-4bcb-8b5d-9670b57c2915",
+        "commandLists": [
+            {
+                "scopes": [
+                    "personal"
+                ],
+                "commands": [
+                    {
+                        "title": "device",
+                        "description": "Get information about a device"
+                    },
+                    {
+                        "title": "inst",
+                        "description": "Run an instruction"
+                    }
+                ]
+            },
+            {
+                "scopes": [
+                    "team"
+                ],
+                "commands": [
+                    {
+                        "title": "device",
+                        "description": "Get information about a device"
+                    },
+                    {
+                        "title": "inst",
+                        "description": "Run an instruction"
+                    }
+                ]
+            }
+        ],
+        "needsChannelSelector": false,
+        "isNotificationOnly": false,
+        "scopes": [
+            "team",
+            "personal"
+        ]
     }
   ],
   "composeExtensions": [
