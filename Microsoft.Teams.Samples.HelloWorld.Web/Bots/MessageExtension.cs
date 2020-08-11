@@ -151,7 +151,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                                         VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
                                         Items = new List<AdaptiveElement> 
                                         {
-                                            new AdaptiveTextBlock(device.IsActive() ? "•" : "✖")
+                                            new AdaptiveTextBlock("•")
                                             {
                                                 Size = AdaptiveTextSize.ExtraLarge,
                                                 Color = device.IsActive() ? AdaptiveTextColor.Good : AdaptiveTextColor.Attention
@@ -166,7 +166,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                                         {
                                             new AdaptiveTextBlock(device.IsActive() ? "Online" : "Offline")
                                             {
-                                                Size = AdaptiveTextSize.Small,
+                                                Size = AdaptiveTextSize.Medium,
                                                 IsSubtle = true
                                             },
                                         }
