@@ -66,13 +66,13 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 await turnContext.SendActivityAsync(MessageFactory.Text($"Here's the device information from Tachyon:"), cancellationToken);
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
             }
-            else if (text.StartsWith("inst "))
+            else if (text.StartsWith("instr "))
             {
                 var parts = text.Split();
                 if (parts.Length != 2)
                 {
                     _logger.LogError($"Bad syntax: '{text}'");
-                    const string replyText = "Wrong syntax. Try \"inst &lt;instruction text&gt;\"";
+                    const string replyText = "Wrong syntax. Try \"instr &lt;instruction text&gt;\"";
                     await turnContext.SendActivityAsync(MessageFactory.Text(replyText), cancellationToken);
                     return;
                 }

@@ -25,21 +25,21 @@
   "accentColor": "#f9f9fa",
   "staticTabs": [
     {
-      "entityId": "com.1e.demoapp.tickets",
+        "entityId": "com.1e.demoapp.tickets",
       "name": "Tickets",
       "contentUrl": "https://yourteamsapp.ngrok.io/hello",
-      "scopes": [
-        "personal"
-      ]
+        "scopes": [
+            "personal"
+        ]
     }
   ],
   "configurableTabs": [
     {
       "configurationUrl": "https://yourteamsapp.ngrok.io/configure",
-      "canUpdateConfiguration": true,
-      "scopes": [
-        "team"
-      ]
+        "canUpdateConfiguration": true,
+        "scopes": [
+            "team"
+        ]
     }
   ],
   "bots": [
@@ -71,7 +71,7 @@
                         "description": "Get information about a device"
                     },
                     {
-                        "title": "inst",
+                        "title": "instr",
                         "description": "Run an instruction"
                     }
                 ]
