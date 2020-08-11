@@ -38,8 +38,13 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
         protected override async Task OnMessageActivityAsync(ITurnContext<IMessageActivity> turnContext, CancellationToken cancellationToken)
         {
             turnContext.Activity.RemoveRecipientMention();
-            var text = turnContext.Activity.Text.Trim().ToLower();
 
+            if (string.IsNullOrWhiteSpace(turnContext.Activity.Text))
+            {
+                return;
+            }
+
+            var text = turnContext.Activity.Text.Trim().ToLower();
 
             if (text.StartsWith("device "))
             {
@@ -235,10 +240,12 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
             var attachments = new MessagingExtensionAttachment[5];
 
-            for (int i = 0; i < 5; i++)
-            {
-                attachments[i] = GetAttachment(title);
-            }
+            attachments[0] = GetAttachment("Adobe Acrobat Reader");
+            attachments[1] = GetAttachment("Upgrade to Windows 10");
+            attachments[2] = GetAttachment("Camtasia 7.1");
+            attachments[3] = GetAttachment("Office 365");
+            attachments[4] = GetAttachment("Floppy Bird");
+            
 
             var result = new MessagingExtensionResponse
             {
@@ -259,7 +266,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             {
                 Title = !string.IsNullOrWhiteSpace(title) ? title : new Faker().Lorem.Sentence(),
                 Text = new Faker().Lorem.Paragraph(),
-                Images = new List<CardImage> { new CardImage("http://lorempixel.com/640/480?rand=" + DateTime.Now.Ticks.ToString()) }
+                Images = new List<CardImage> { new CardImage("http://lorempixel.com/640/480?rand=" + DateTime.Now.Ticks) }
             };
 
             return card

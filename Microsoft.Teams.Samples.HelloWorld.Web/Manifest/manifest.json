@@ -26,8 +26,8 @@
   "staticTabs": [
     {
         "entityId": "com.1e.demoapp.tickets",
-      "name": "Tickets",
       "contentUrl": "https://yourteamsapp.ngrok.io/hello",
+        "name": "Shopping",
         "scopes": [
             "personal"
         ]
