@@ -18,21 +18,32 @@ using Bogus;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Tachyon.SDK.Consumer.Api;
+using Tachyon.SDK.Consumer.DefaultImplementations;
+using Tachyon.SDK.Consumer.Models.Api;
+using Tachyon.SDK.Consumer.Models.Receive;
 
 namespace Microsoft.Teams.Samples.HelloWorld.Web
 {
     public class MessageExtension : TeamsActivityHandler
     {
         private readonly ILogger<MessageExtension> _logger;
-        private HttpClient _httpClient;
-        private string _tachyonHostName;
+        private readonly HttpClient _httpClient;
+        private readonly string _tachyonHostName;
+        private DefaultTransportProxy _transportProxy;
+        private LogProxy<MessageExtension> _logProxy;
+        private const string ConsumerHeader = "X-Tachyon-Consumer";
+        private const string ConsumerName = "Teams";
+        private static string _lastDevice;
 
         public MessageExtension(IConfiguration config, ILogger<MessageExtension> logger)
         {
             _logger = logger;
             _tachyonHostName = config["TachyonHostname"];
             _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.Add("X-Tachyon-Consumer", "Teams");
+            _httpClient.DefaultRequestHeaders.Add(ConsumerHeader, ConsumerName);
+            _logProxy = new LogProxy<MessageExtension>(logger);
+            _transportProxy = new DefaultTransportProxy(_logProxy, ConsumerName, $"http://{_tachyonHostName}/Consumer/");
         }
 
         protected override async Task OnMessageActivityAsync(ITurnContext<IMessageActivity> turnContext, CancellationToken cancellationToken)
@@ -58,6 +69,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 }
 
                 var fqdn = parts[1];
+
                 var device = await GetDeviceAsync(fqdn);
 
                 if (device == null)
@@ -70,6 +82,8 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 await turnContext.SendActivityAsync(MessageFactory.Text($"Here's the device information from Tachyon:"), cancellationToken);
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
+
+                _lastDevice = fqdn;
             }
             else if (text.StartsWith("instr "))
             {
@@ -77,29 +91,40 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 if (parts.Length != 2)
                 {
                     _logger.LogError($"Bad syntax: '{text}'");
-                    const string replyText = "Wrong syntax. Try \"instr &lt;instruction text&gt;\"";
+                    const string replyText = "Wrong syntax. Try \"instr &lt;instruction ID&gt;\"";
                     await turnContext.SendActivityAsync(MessageFactory.Text(replyText), cancellationToken);
                     return;
                 }
 
+                var instructionId = parts[1];
+
+                string response;
+                try
+                {
+                    response = RunInstruction(instructionId);
+                }
+                catch (Exception e)
+                {
+                    response = $"Exception while running instruction: {e}";
+                }
+
+                if (string.IsNullOrWhiteSpace(response))
+                {
+                    response = "There was an error while running instruction ☹";
+                }
+
                 await turnContext.SendActivityAsync(MessageFactory.Text("Instruction result:"), cancellationToken);
+                await turnContext.SendActivityAsync(MessageFactory.Text(response), cancellationToken);
             }
         }
 
-        private async Task<Device?> GetDeviceAsync(string fqdn)
+        private async Task<Device> GetDeviceAsync(string fqdn)
         {
             var data = System.Text.Encoding.UTF8.GetBytes(fqdn);
             var base64Fqdn = System.Convert.ToBase64String(data);
-            HttpResponseMessage response;
-            try
-            {
-                response = await _httpClient.GetAsync($"http://{_tachyonHostName}/consumer/devices/fqdn/{base64Fqdn}");
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Exception while calling Tachyon");
-                throw;
-            }
+
+            var urlPath = $"consumer/devices/fqdn/{base64Fqdn}";
+            var response = await CallTachyon(HttpMethod.Get, urlPath);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
@@ -126,6 +151,56 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 Console.WriteLine(e);
                 throw;
             }
+        }
+
+        private string RunInstruction(string instructionName)
+        {
+
+            var instructionDefs = new InstructionDefinitions(_transportProxy, _logProxy);
+            var instructionDef = MakeTachyonCall(() => instructionDefs.GetInstructionDefinition(instructionName));
+
+            var instructions = new Instructions(_transportProxy, _logProxy);
+            var instruction = MakeTachyonCall(() =>
+                instructions.SendTargetedInstruction(instructionDef.Id, null, 10, 10, new List<string> {"Client2.ntl.local"}));
+
+            var instructionStatus = (TachyonInstructionStatus) instruction.Status;
+            if (instructionStatus != TachyonInstructionStatus.Approved &&
+                instructionStatus != TachyonInstructionStatus.Authenticating &&
+                instructionStatus != TachyonInstructionStatus.Complete &&
+                instructionStatus != TachyonInstructionStatus.Created &&
+                instructionStatus != TachyonInstructionStatus.InApproval &&
+                instructionStatus != TachyonInstructionStatus.InProgress &&
+                instructionStatus != TachyonInstructionStatus.Sent)
+            {
+                throw new Exception($"Bad instruction status {instructionStatus}");
+            }
+
+            var responses = new Responses(_transportProxy, _logProxy);
+
+
+            var maxWait = TimeSpan.FromSeconds(80);
+
+            var startTime = DateTime.Now;
+            var elapsed = TimeSpan.FromSeconds(0);
+            Dictionary<string, object> response = null;
+            while (elapsed < maxWait)
+            {
+                response = MakeTachyonCall(() => responses.GetProcessedResponses(instruction.Id));
+
+                if (response != null && response.Count != 0)
+                {
+                    break;
+                }
+
+                elapsed = DateTime.Now - startTime;
+            }
+
+            if (response == null)
+            {
+                return null;
+            }
+        
+            return System.Text.Json.JsonSerializer.Serialize(response);
         }
 
         private Attachment CreateDeviceCard(Device device)
@@ -211,6 +286,29 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             };
         }
 
+        private async Task<HttpResponseMessage> CallTachyon(HttpMethod method, string urlPath, string body = null)
+        {
+            var request = new HttpRequestMessage(method, $"http://{_tachyonHostName}/{urlPath}");
+            if (body != null)
+            {
+                request.Content = new StringContent(body);
+            }
+
+            HttpResponseMessage response;
+            try
+            {
+                response = await _httpClient.SendAsync(request);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Exception while calling Tachyon");
+                throw;
+            }
+
+            return response;
+        }
+
+
         private string ToTimeZoneString(int offsetMins)
         {
             var sign = offsetMins >= 0 ? "+" : "-";
@@ -290,6 +388,38 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     }
                 },
             });
+        }
+
+        private  static T MakeTachyonCall<T>(Func<ApiCallResponse<T>> call) where T : class
+        {
+            ApiCallResponse<T> response;
+            try
+            {
+                response = call();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Exception while calling Tachyon: {ex}", ex);
+            }
+
+            if (response == null)
+            {
+                throw new Exception("Tachyon returned null response");
+            }
+
+            if (!response.Success)
+            {
+                throw new Exception($"Tachyon returned an error response {response.Errors}");
+            }
+
+            var receivedObject = response.ReceivedObject;
+
+            if (receivedObject == null)
+            {
+                throw new Exception("Tachyon returned response with null 'ReceivedObj'");
+            }
+
+            return receivedObject;
         }
     }
 }

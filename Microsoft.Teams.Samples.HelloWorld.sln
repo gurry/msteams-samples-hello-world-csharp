@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Microsoft.Teams.Samples.Hel
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Proxy", "Proxy\Proxy.csproj", "{CA13C896-0132-476E-B636-811589983AC4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tachyon.SDK.Consumer", "Tachyon.SDK.Consumer\Tachyon.SDK.Consumer.csproj", "{1A13174C-F45B-4C37-A3C6-A7B0FECA1DD0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{CA13C896-0132-476E-B636-811589983AC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CA13C896-0132-476E-B636-811589983AC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CA13C896-0132-476E-B636-811589983AC4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1A13174C-F45B-4C37-A3C6-A7B0FECA1DD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1A13174C-F45B-4C37-A3C6-A7B0FECA1DD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1A13174C-F45B-4C37-A3C6-A7B0FECA1DD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1A13174C-F45B-4C37-A3C6-A7B0FECA1DD0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
