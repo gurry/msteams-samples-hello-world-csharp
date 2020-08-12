@@ -40,15 +40,17 @@ namespace Proxy.Controllers
         [HttpDelete("{**path}")]
         public async Task<IActionResult> Get(string path)
         {
-            _logger.LogInformation($"-> GET {path}");
+            _logger.LogInformation($"-> {Request.Method} {path}");
 
             var request = new HttpRequestMessage(ToHttpMethod(Request.Method), path);
             foreach (var header in Request.Headers)
             {
-                request.Headers.Add(header.Key, header.Value[0]);
+                var headerNameLower = header.Key.ToLowerInvariant();
+                if (headerNameLower != "host" && headerNameLower != "content-length"&& headerNameLower != "content-type") // "Host" fucks up tachyon. and "content-*" cause HttpRequest to throw.
+                {
+                    request.Headers.Add(header.Key, header.Value[0]);
+                }
             }
-
-            request.Headers.Remove("host");
 
             if (Request.BodyReader != null)
             {
@@ -58,6 +60,10 @@ namespace Proxy.Controllers
             }
 
             var responseFromUpstream = await _httpClient.SendAsync(request);
+
+
+            //_logger.LogInformation($"<- Upstream: {responseFromUpstream.StatusCode}");
+
             var bodyFromUpstream = await responseFromUpstream.Content.ReadAsStringAsync();
 
             var result = new ObjectResult(bodyFromUpstream)
