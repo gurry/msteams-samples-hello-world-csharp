@@ -14,7 +14,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AdaptiveCards;
-using Bogus;
+using Microsoft.Bot.Connector.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
@@ -35,6 +35,30 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
         private const string ConsumerHeader = "X-Tachyon-Consumer";
         private const string ConsumerName = "Teams";
         private static string _lastDevice;
+
+        private static List<InstructionDefinition> _instructions = new List<InstructionDefinition>
+        {
+            new InstructionDefinition()
+            {
+                ReadablePayload = "What processes are running?",
+                Description = "Get all running processes"
+            },
+            new InstructionDefinition
+            {
+                ReadablePayload = "What services are running?",
+                Description = "Retrieves all the running services. Windows only",
+            },
+            new InstructionDefinition
+            {
+                ReadablePayload = "What processor types are being used?",
+                Description = "Get processor types being used by devices. Windows only",
+            },
+            new InstructionDefinition
+            {
+                ReadablePayload = "Which hard drives are installed?",
+                Description = "Get details of physical hard drives. Windows only",
+            },
+        };
 
         public MessageExtension(IConfiguration config, ILogger<MessageExtension> logger)
         {
@@ -309,18 +333,6 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
         }
 
 
-        private string ToTimeZoneString(int offsetMins)
-        {
-            var sign = offsetMins >= 0 ? "+" : "-";
-
-            var offsetMinsAbs = Math.Abs(offsetMins);
-            var hours = offsetMinsAbs / 60;
-            var minutes = offsetMinsAbs % 60;
-
-            return $"{sign}{hours}:{minutes}";
-        }
-
-
         protected override Task<MessagingExtensionResponse> OnTeamsMessagingExtensionQueryAsync(ITurnContext<IInvokeActivity> turnContext, MessagingExtensionQuery query, CancellationToken cancellationToken)
         {
             var title = "";
@@ -336,40 +348,102 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 throw new NotImplementedException($"Invalid CommandId: {query.CommandId}");
             }
 
-            var attachments = new MessagingExtensionAttachment[5];
-
-            attachments[0] = GetAttachment("Adobe Acrobat Reader");
-            attachments[1] = GetAttachment("Upgrade to Windows 10");
-            attachments[2] = GetAttachment("Camtasia 7.1");
-            attachments[3] = GetAttachment("Office 365");
-            attachments[4] = GetAttachment("Floppy Bird");
-            
 
             var result = new MessagingExtensionResponse
             {
                 ComposeExtension = new MessagingExtensionResult
                 {
+                    
                     AttachmentLayout = "list",
                     Type = "result",
-                    Attachments = attachments.ToList()
+                    Attachments = _instructions.Select(ToAttachment).ToList()
                 },
             };
             return Task.FromResult(result);
 
         }
 
-        private static MessagingExtensionAttachment GetAttachment(string title)
+        private static MessagingExtensionAttachment ToAttachment(InstructionDefinition instructionDefinition)
         {
-            var card = new ThumbnailCard
+            var preview = new ThumbnailCard
             {
-                Title = !string.IsNullOrWhiteSpace(title) ? title : new Faker().Lorem.Sentence(),
-                Text = new Faker().Lorem.Paragraph(),
-                Images = new List<CardImage> { new CardImage("http://lorempixel.com/640/480?rand=" + DateTime.Now.Ticks) }
+                Title = instructionDefinition.ReadablePayload,
+                Text = instructionDefinition.Description,
             };
 
-            return card
-                .ToAttachment()
-                .ToMessagingExtensionAttachment();
+            var content = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
+            {
+                Body = new List<AdaptiveElement>
+                {
+                    new AdaptiveContainer
+                    {
+                        Items = new List<AdaptiveElement>
+                        {
+                            new AdaptiveTextBlock(instructionDefinition.ReadablePayload)
+                            {
+                                Weight = AdaptiveTextWeight.Bolder,
+                                Size = AdaptiveTextSize.Large
+                            },
+                            new AdaptiveTextBlock(instructionDefinition.Description),
+                            new AdaptiveColumnSet
+                            {
+
+                                Columns = new List<AdaptiveColumn> {
+                                    new AdaptiveColumn()
+                                    {
+                                        Width = "auto",
+                                        VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+                                        Items = new List<AdaptiveElement>
+                                            {
+                                            new AdaptiveActionSet()
+                                            {
+                                                Actions = new List<AdaptiveAction>
+                                                {
+                                                    new AdaptiveSubmitAction
+                                                    {
+                                                        Title = "Run"
+                                                    },
+                                                }
+                                            }
+                                        }
+                                    },
+                                    //new AdaptiveColumn
+                                    //{
+                                    //    Width = "auto",
+                                    //    VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+                                    //    Items = new List<AdaptiveElement>
+                                    //    {
+                                    //        new AdaptiveTextBlock(" on ")
+                                    //    }
+                                    //},
+                                    //new AdaptiveColumn
+                                    //{
+                                    //    Width = "auto",
+                                    //    VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+                                    //    Items = new List<AdaptiveElement>
+                                    //    {
+                                    //        new AdaptiveTextInput()
+                                    //        {
+                                    //            Value = _lastDevice ?? "",
+                                    //            Placeholder = _lastDevice == null ? "Enter FQDN" : null,
+                                    //        }
+                                    //    }
+                                    //}
+                                }
+                            }
+                        },
+
+                    },
+                }
+            };
+
+            return new MessagingExtensionAttachment
+            {
+                ContentType = AdaptiveCard.ContentType,
+                Content = content,
+                Preview = preview.ToAttachment(),
+            };
+
         }
 
         protected override Task<MessagingExtensionResponse> OnTeamsMessagingExtensionSelectItemAsync(ITurnContext<IInvokeActivity> turnContext, JObject query, CancellationToken cancellationToken)
