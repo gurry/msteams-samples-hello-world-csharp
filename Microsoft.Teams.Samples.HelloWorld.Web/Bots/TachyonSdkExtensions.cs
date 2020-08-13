@@ -52,9 +52,9 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web.Bots
             return result.Instructions;
         }
 
-        private static T MakeTachyonCall<T>(Func<ApiCallResponse<T>> call) where T : class
+        public static T MakeTachyonCall<T>(Func<ApiCallResponse<T>> call) where T : class
         {
-            ApiCallResponse<T> response;
+             ApiCallResponse<T> response;
             try
             {
                 response = call();
@@ -71,7 +71,9 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web.Bots
 
             if (!response.Success)
             {
-                throw new Exception($"Tachyon returned an error response {response.Errors}");
+                var error = response.Errors?.FirstOrDefault();
+                var errorMsg = error != null ? ": " + error.Message : "";
+                throw new Exception($"Tachyon returned an error response {errorMsg}");
             }
 
             var receivedObject = response.ReceivedObject;

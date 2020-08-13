@@ -239,7 +239,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
         {
 
             var instructions = new Instructions(_transportProxy, _logProxy);
-            var instruction = MakeTachyonCall(() =>
+            var instruction = TachyonSdkExtensions.MakeTachyonCall(() =>
                 instructions.SendTargetedInstruction(instructionId, null, 10, 10, new List<string> {deviceFqdn}));
 
             var instructionStatus = (TachyonInstructionStatus) instruction.Status;
@@ -265,7 +265,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             while (elapsed < maxWait)
             {
                 var responseContainer =
-                    MakeTachyonCall(() => responses.GetAggregatedResponses(instruction.Id, null, 15));
+                    TachyonSdkExtensions.MakeTachyonCall(() => responses.GetAggregatedResponses(instruction.Id, null, 15));
 
                 if (responseContainer.Responses?.Count() > 0)
                 {
@@ -386,6 +386,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             else
             {
                 var columnSet = new AdaptiveColumnSet();
+
                 var columnNames = responses.First().Values.Keys.Select(kvp => kvp);
 
                 columnSet.Columns = columnNames.Select(c => new AdaptiveColumn
@@ -576,38 +577,6 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     }
                 },
             });
-        }
-
-        private  static T MakeTachyonCall<T>(Func<ApiCallResponse<T>> call) where T : class
-        {
-            ApiCallResponse<T> response;
-            try
-            {
-                response = call();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Exception while calling Tachyon: {ex}", ex);
-            }
-
-            if (response == null)
-            {
-                throw new Exception("Tachyon returned null response");
-            }
-
-            if (!response.Success)
-            {
-                throw new Exception($"Tachyon returned an error response {response.Errors}");
-            }
-
-            var receivedObject = response.ReceivedObject;
-
-            if (receivedObject == null)
-            {
-                throw new Exception("Tachyon returned response with null 'ReceivedObj'");
-            }
-
-            return receivedObject;
         }
     }
 }
