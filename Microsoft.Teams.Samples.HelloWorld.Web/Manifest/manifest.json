@@ -15,8 +15,8 @@
     "full": "1E DemoApp"
   },
   "description": {
-    "short": "An app to simplify tech support",
-    "full": "Powered by 1E Tachyon, this app simplifies delivery of technical support in an organization."
+    "short": "An app to run Tachyon instructions",
+    "full": "This app allows an IT admin to interact with and control a device through Tachyon instructions"
   },
   "icons": {
     "outline": "1e-outline.png",
