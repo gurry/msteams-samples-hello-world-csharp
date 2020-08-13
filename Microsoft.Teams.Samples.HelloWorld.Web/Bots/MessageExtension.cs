@@ -20,8 +20,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
 using Tachyon.SDK.Consumer.Api;
 using Tachyon.SDK.Consumer.DefaultImplementations;
+using Tachyon.SDK.Consumer.Enums;
 using Tachyon.SDK.Consumer.Models.Api;
+using Tachyon.SDK.Consumer.Models.Common;
 using Tachyon.SDK.Consumer.Models.Receive;
+using Task = System.Threading.Tasks.Task;
 
 namespace Microsoft.Teams.Samples.HelloWorld.Web
 {
@@ -36,26 +39,26 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
         private const string ConsumerName = "Teams";
         private static string _lastDevice;
 
-        private static List<InstructionDefinition> _instructions = new List<InstructionDefinition>
+        private static List<InstructionHint> _instructions = new List<InstructionHint>
         {
-            new InstructionDefinition()
+            new InstructionHint()
             {
-                ReadablePayload = "What processes are running?",
+                ReadableName = "What processes are running?",
                 Description = "Get all running processes"
             },
-            new InstructionDefinition
+            new InstructionHint
             {
-                ReadablePayload = "What services are running?",
+                ReadableName = "What services are running?",
                 Description = "Retrieves all the running services. Windows only",
             },
-            new InstructionDefinition
+            new InstructionHint
             {
-                ReadablePayload = "What processor types are being used?",
+                ReadableName = "What processor types are being used?",
                 Description = "Get processor types being used by devices. Windows only",
             },
-            new InstructionDefinition
+            new InstructionHint
             {
-                ReadablePayload = "Which hard drives are installed?",
+                ReadableName = "Which hard drives are installed?",
                 Description = "Get details of physical hard drives. Windows only",
             },
         };
@@ -332,22 +335,29 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             return response;
         }
 
+        private static List<InstructionType> _instructionTypes = new List<InstructionType>
+            {InstructionType.Action, InstructionType.Question};
 
         protected override Task<MessagingExtensionResponse> OnTeamsMessagingExtensionQueryAsync(ITurnContext<IInvokeActivity> turnContext, MessagingExtensionQuery query, CancellationToken cancellationToken)
         {
-            var title = "";
-            var titleParam = query.Parameters?.FirstOrDefault(p => p.Name == "cardTitle");
-            if (titleParam != null)
+            var searchString = "";
+            if (query.Parameters!= null && query.Parameters.Count > 0)
             {
-                title = titleParam.Value.ToString();
+                var instructionParam = query.Parameters.FirstOrDefault(p => p.Name.ToLowerInvariant() == "cardtitle");
+                if (instructionParam != null)
+                {
+                    searchString = instructionParam.Value as string;
+                }
+                else
+                {
+                    searchString = "what";
+                }
             }
 
-            if (query == null)
-            {
-                // We only process the 'getRandomText' queries with this message extension
-                throw new NotImplementedException($"Invalid CommandId: {query.CommandId}");
-            }
+            var instructionDefs = new InstructionDefinitions(_transportProxy, _logProxy);
 
+            var foundInstructionDefs = MakeTachyonCall(() =>
+                instructionDefs.GetInstructionDefinitionHints(searchString, _instructionTypes));
 
             var result = new MessagingExtensionResponse
             {
@@ -356,18 +366,18 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     
                     AttachmentLayout = "list",
                     Type = "result",
-                    Attachments = _instructions.Select(ToAttachment).ToList()
+                    Attachments = foundInstructionDefs.Instructions.Select(ToAttachment).ToList()
                 },
             };
             return Task.FromResult(result);
 
         }
 
-        private static MessagingExtensionAttachment ToAttachment(InstructionDefinition instructionDefinition)
+        private static MessagingExtensionAttachment ToAttachment(InstructionHint instructionDefinition)
         {
             var preview = new ThumbnailCard
             {
-                Title = instructionDefinition.ReadablePayload,
+                Title = instructionDefinition.ReadableName,
                 Text = instructionDefinition.Description,
             };
 
@@ -379,7 +389,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     {
                         Items = new List<AdaptiveElement>
                         {
-                            new AdaptiveTextBlock(instructionDefinition.ReadablePayload)
+                            new AdaptiveTextBlock(instructionDefinition.ReadableName)
                             {
                                 Weight = AdaptiveTextWeight.Bolder,
                                 Size = AdaptiveTextSize.Large
