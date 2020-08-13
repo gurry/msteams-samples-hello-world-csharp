@@ -90,14 +90,14 @@
       "botId": "2ea52b84-e497-4bcb-8b5d-9670b57c2915",
       "commands": [
         {
-          "id": "findTicket",
-          "description": "Finds a support ticket",
-          "title": "FindTicket",
+          "id": "findInstruction",
+          "description": "Finds a Tachyon instruction",
+          "title": "FindInstruction",
           "initialRun": true,
           "parameters": [
             {
-              "name": "cardTitle",
-              "description": "Card title to use",
+              "name": "instruction",
+              "description": "Search instruction",
               "title": "Card title"
             }
           ]

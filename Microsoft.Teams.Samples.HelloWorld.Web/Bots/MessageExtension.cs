@@ -343,7 +343,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             var searchString = "";
             if (query.Parameters!= null && query.Parameters.Count > 0)
             {
-                var instructionParam = query.Parameters.FirstOrDefault(p => p.Name.ToLowerInvariant() == "cardtitle");
+                var instructionParam = query.Parameters.FirstOrDefault(p => p.Name.ToLowerInvariant() == "instruction");
                 if (instructionParam != null)
                 {
                     searchString = instructionParam.Value as string;
