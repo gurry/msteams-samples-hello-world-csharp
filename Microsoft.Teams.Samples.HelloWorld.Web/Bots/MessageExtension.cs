@@ -15,6 +15,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using AdaptiveCards;
 using Microsoft.Bot.Connector.Authentication;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
@@ -99,7 +100,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 {
                     selectedDevice = _lastDeviceQueried;
                 }
-                else if (parts.Length == 2 && string.IsNullOrWhiteSpace(parts[1]))
+                else if (parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[1]))
                 {
                     selectedDevice = parts[1];
                 }
@@ -147,25 +148,24 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 }
 
                 await turnContext.SendActivityAsync(MessageFactory.Text($"Running instruction '{instruction.ReadableName}'..."), cancellationToken);
-                string response;
+                IEnumerable<Response> responses;
                 try
                 {
-                    response = RunInstruction(instruction.Id, _selectedDevice);
+                    responses = RunInstruction(instruction.Id, _selectedDevice);
                 }
                 catch (Exception e)
                 {
-                    response = $"Exception while running instruction: {e}";
+                    await turnContext.SendActivityAsync(MessageFactory.Text($"Exception while running instruction: {e}"), cancellationToken);
+                    return;
                 }
+                
 
-                if (string.IsNullOrWhiteSpace(response))
-                {
-                    response = "There was an error while running instruction ☹";
-                }
+                var card = ToInstructionResultCard(responses);
 
-                await turnContext.SendActivityAsync(MessageFactory.Text("Instruction result:"), cancellationToken);
-                await turnContext.SendActivityAsync(MessageFactory.Text(response), cancellationToken);
+                await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
             }
         }
+
 
         protected override Task<MessagingExtensionResponse> OnTeamsMessagingExtensionQueryAsync(ITurnContext<IInvokeActivity> turnContext, MessagingExtensionQuery query, CancellationToken cancellationToken)
         {
@@ -235,7 +235,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             }
         }
 
-        private string RunInstruction(int instructionId, string deviceFqdn)
+        private IEnumerable<Response> RunInstruction(int instructionId, string deviceFqdn)
         {
 
             var instructions = new Instructions(_transportProxy, _logProxy);
@@ -261,26 +261,24 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
             var startTime = DateTime.Now;
             var elapsed = TimeSpan.FromSeconds(0);
-            Dictionary<string, object> response = null;
+            IEnumerable<Response> responseObjs = null;
             while (elapsed < maxWait)
             {
-                response = MakeTachyonCall(() => responses.GetProcessedResponses(instruction.Id));
+                var responseContainer =
+                    MakeTachyonCall(() => responses.GetAggregatedResponses(instruction.Id, null, 15));
 
-                if (response != null && response.Count != 0)
+                if (responseContainer.Responses?.Count() > 0)
                 {
+                    responseObjs = responseContainer.Responses;
                     break;
                 }
 
                 elapsed = DateTime.Now - startTime;
             }
 
-            if (response == null)
-            {
-                return null;
-            }
-        
-            return System.Text.Json.JsonSerializer.Serialize(response);
+            return responseObjs;
         }
+
 
         private Attachment CreateDeviceCard(Device device)
         {
@@ -363,6 +361,80 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 ContentType = AdaptiveCard.ContentType,
                 Content = card,
                 
+            };
+        }
+
+        private Attachment ToInstructionResultCard(IEnumerable<Response> responses)
+        {
+            AdaptiveCard card = null;
+            if (responses == null || !responses.Any())
+            {
+                card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
+                {
+                    Body = new List<AdaptiveElement>
+                    {
+                        new AdaptiveContainer
+                        {
+                            Items = new List<AdaptiveElement>
+                            {
+                                new AdaptiveTextBlock("Instruction returned no results")
+                            }
+                        }
+                    }
+                };
+            }
+            else
+            {
+                var columnSet = new AdaptiveColumnSet();
+                var columnNames = responses.First().Values.Keys.Select(kvp => kvp);
+
+                columnSet.Columns = columnNames.Select(c => new AdaptiveColumn
+                {
+                    Width = "auto",
+                    VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+                    Items = new List<AdaptiveElement>()
+                    {
+                        new AdaptiveTextBlock(c)
+                        {
+                            Weight = AdaptiveTextWeight.Bolder
+                        },
+                    }
+                }).ToList();
+
+                foreach (var response in responses)
+                {
+                    for (var i = 0; i < columnSet.Columns.Count; i++)
+                    {
+                        var valueList = response.Values.Values.ToList();
+                        columnSet.Columns[i].Items.Add(new AdaptiveTextBlock(valueList[i].ToString()));
+                    }
+                }
+
+                card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
+                {
+                    Body = new List<AdaptiveElement>
+                    {
+                        new AdaptiveContainer
+                        {
+                            Items = new List<AdaptiveElement>
+                            {
+                                new AdaptiveTextBlock("Instruction Result")
+                                {
+                                    Weight = AdaptiveTextWeight.Bolder,
+                                    Size = AdaptiveTextSize.Large
+                                },
+                                columnSet
+                            }
+                        },
+                    }
+                };
+            }
+
+
+            return new Attachment
+            {
+                ContentType = AdaptiveCard.ContentType,
+                Content = card,
             };
         }
 
