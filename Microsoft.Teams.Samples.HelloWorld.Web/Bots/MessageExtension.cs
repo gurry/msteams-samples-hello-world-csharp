@@ -18,6 +18,7 @@ using Microsoft.Bot.Connector.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using Microsoft.Teams.Samples.HelloWorld.Web.Bots;
 using Tachyon.SDK.Consumer.Api;
 using Tachyon.SDK.Consumer.DefaultImplementations;
 using Tachyon.SDK.Consumer.Enums;
@@ -37,31 +38,11 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
         private LogProxy<MessageExtension> _logProxy;
         private const string ConsumerHeader = "X-Tachyon-Consumer";
         private const string ConsumerName = "Teams";
-        private static string _lastDevice;
+        private static string _selectedDevice;
+        private readonly InstructionDefinitions _instructionDefs;
+        private static string _lastDeviceQueried;
 
-        private static List<InstructionHint> _instructions = new List<InstructionHint>
-        {
-            new InstructionHint()
-            {
-                ReadableName = "What processes are running?",
-                Description = "Get all running processes"
-            },
-            new InstructionHint
-            {
-                ReadableName = "What services are running?",
-                Description = "Retrieves all the running services. Windows only",
-            },
-            new InstructionHint
-            {
-                ReadableName = "What processor types are being used?",
-                Description = "Get processor types being used by devices. Windows only",
-            },
-            new InstructionHint
-            {
-                ReadableName = "Which hard drives are installed?",
-                Description = "Get details of physical hard drives. Windows only",
-            },
-        };
+        private static IList<InstructionHint> _lastReturnedInstructions;
 
         public MessageExtension(IConfiguration config, ILogger<MessageExtension> logger)
         {
@@ -71,20 +52,16 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             _httpClient.DefaultRequestHeaders.Add(ConsumerHeader, ConsumerName);
             _logProxy = new LogProxy<MessageExtension>(logger);
             _transportProxy = new DefaultTransportProxy(_logProxy, ConsumerName, $"http://{_tachyonHostName}/Consumer/");
+            _instructionDefs = new InstructionDefinitions(_transportProxy, _logProxy);
         }
 
         protected override async Task OnMessageActivityAsync(ITurnContext<IMessageActivity> turnContext, CancellationToken cancellationToken)
         {
             turnContext.Activity.RemoveRecipientMention();
 
-            if (string.IsNullOrWhiteSpace(turnContext.Activity.Text))
-            {
-                return;
-            }
+            var text = turnContext.Activity.Text?.Trim().ToLower() ?? "";
 
-            var text = turnContext.Activity.Text.Trim().ToLower();
-
-            if (text.StartsWith("device "))
+            if (text.StartsWith("info "))
             {
                 var parts = text.Split();
                 if (parts.Length != 2)
@@ -97,38 +74,83 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 var fqdn = parts[1];
 
+                await turnContext.SendActivityAsync(MessageFactory.Text("Getting device information from Tachyon..."), cancellationToken);
+
                 var device = await GetDeviceAsync(fqdn);
 
                 if (device == null)
                 {
-                    await turnContext.SendActivityAsync(MessageFactory.Text($"Sorry, could not find any information about device \"{fqdn}\" ☹"), cancellationToken);
+                    await turnContext.SendActivityAsync(MessageFactory.Text($"Sorry, could not find any information about '{fqdn}' ☹"), cancellationToken);
                     return;
                 }
 
                 var card = CreateDeviceCard(device);
 
-                await turnContext.SendActivityAsync(MessageFactory.Text($"Here's the device information from Tachyon:"), cancellationToken);
-                await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
+                _lastDeviceQueried = fqdn;
 
-                _lastDevice = fqdn;
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Here's what I found:"), cancellationToken);
+                await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
             }
-            else if (text.StartsWith("instr "))
+            else if (text.StartsWith("select"))
             {
                 var parts = text.Split();
-                if (parts.Length != 2)
+                string selectedDevice = null;
+                if (parts.Length == 1)
+                {
+                    selectedDevice = _lastDeviceQueried;
+                }
+                else if (parts.Length == 2 && string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    selectedDevice = parts[1];
+                }
+
+                if (selectedDevice == null)
                 {
                     _logger.LogError($"Bad syntax: '{text}'");
-                    const string replyText = "Wrong syntax. Try \"instr &lt;instruction ID&gt;\"";
+                    const string replyText = "Wrong syntax. Try \"select &lt;device FQDN&gt;\"";
                     await turnContext.SendActivityAsync(MessageFactory.Text(replyText), cancellationToken);
                     return;
                 }
 
-                var instructionId = parts[1];
+                _selectedDevice = selectedDevice;
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Device '{_selectedDevice}' selected ✔. Any instructions you enter will run against it."), cancellationToken);
+            }
+            else if (text== "unselect")
+            {
+                if (_selectedDevice != null)
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Text($"Device '{_selectedDevice}' unselected"), cancellationToken);
+                    _selectedDevice = null;
+                }
+            }
+            else 
+            {
+                if (_selectedDevice == null)
+                {
+                    return;
+                }
 
+                InstructionHint instruction = null;
+                if (!string.IsNullOrEmpty(text))
+                {
+                    instruction = _instructionDefs.Search(text).FirstOrDefault();
+                }
+                else if (_lastReturnedInstructions != null && _lastReturnedInstructions.Count > 0)
+                {
+                    instruction = _lastReturnedInstructions[0];
+                }
+
+                if (instruction == null)
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Text($"Sorry, no matching instruction found ☹"), cancellationToken);
+                    return;
+                }
+
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Running instruction '{instruction.ReadableName}'..."), cancellationToken);
                 string response;
                 try
                 {
-                    response = RunInstruction(instructionId);
+                    response = RunInstruction(instruction.Id, _selectedDevice);
                 }
                 catch (Exception e)
                 {
@@ -144,6 +166,39 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 await turnContext.SendActivityAsync(MessageFactory.Text(response), cancellationToken);
             }
         }
+
+        protected override Task<MessagingExtensionResponse> OnTeamsMessagingExtensionQueryAsync(ITurnContext<IInvokeActivity> turnContext, MessagingExtensionQuery query, CancellationToken cancellationToken)
+        {
+            var searchString = "";
+            if (query.Parameters!= null && query.Parameters.Count > 0)
+            {
+                var instructionParam = query.Parameters.FirstOrDefault(p => p.Name.ToLowerInvariant() == "instruction");
+                if (instructionParam != null)
+                {
+                    searchString = instructionParam.Value as string;
+                }
+                else
+                {
+                    searchString = "what";
+                }
+            }
+
+            _lastReturnedInstructions = _instructionDefs.Search(searchString);
+
+            var result = new MessagingExtensionResponse
+            {
+                ComposeExtension = new MessagingExtensionResult
+                {
+                    
+                    AttachmentLayout = "list",
+                    Type = "result",
+                    Attachments = _lastReturnedInstructions.Select(ToAttachment).ToList()
+                },
+            };
+            return Task.FromResult(result);
+
+        }
+
 
         private async Task<Device> GetDeviceAsync(string fqdn)
         {
@@ -180,15 +235,12 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             }
         }
 
-        private string RunInstruction(string instructionName)
+        private string RunInstruction(int instructionId, string deviceFqdn)
         {
-
-            var instructionDefs = new InstructionDefinitions(_transportProxy, _logProxy);
-            var instructionDef = MakeTachyonCall(() => instructionDefs.GetInstructionDefinition(instructionName));
 
             var instructions = new Instructions(_transportProxy, _logProxy);
             var instruction = MakeTachyonCall(() =>
-                instructions.SendTargetedInstruction(instructionDef.Id, null, 10, 10, new List<string> {"Client2.ntl.local"}));
+                instructions.SendTargetedInstruction(instructionId, null, 10, 10, new List<string> {deviceFqdn}));
 
             var instructionStatus = (TachyonInstructionStatus) instruction.Status;
             if (instructionStatus != TachyonInstructionStatus.Approved &&
@@ -271,7 +323,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                                         VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
                                         Items = new List<AdaptiveElement> 
                                         {
-                                            new AdaptiveTextBlock(device.IsActive() ? "Online" : "Offline")
+                                            new AdaptiveTextBlock(device.IsActive() ? "Is online" : "Is offline")
                                             {
                                                 Size = AdaptiveTextSize.Medium,
                                                 IsSubtle = true
@@ -309,7 +361,8 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             return new Attachment
             {
                 ContentType = AdaptiveCard.ContentType,
-                Content = card
+                Content = card,
+                
             };
         }
 
@@ -335,43 +388,8 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             return response;
         }
 
-        private static List<InstructionType> _instructionTypes = new List<InstructionType>
-            {InstructionType.Action, InstructionType.Question};
 
-        protected override Task<MessagingExtensionResponse> OnTeamsMessagingExtensionQueryAsync(ITurnContext<IInvokeActivity> turnContext, MessagingExtensionQuery query, CancellationToken cancellationToken)
-        {
-            var searchString = "";
-            if (query.Parameters!= null && query.Parameters.Count > 0)
-            {
-                var instructionParam = query.Parameters.FirstOrDefault(p => p.Name.ToLowerInvariant() == "instruction");
-                if (instructionParam != null)
-                {
-                    searchString = instructionParam.Value as string;
-                }
-                else
-                {
-                    searchString = "what";
-                }
-            }
-
-            var instructionDefs = new InstructionDefinitions(_transportProxy, _logProxy);
-
-            var foundInstructionDefs = MakeTachyonCall(() =>
-                instructionDefs.GetInstructionDefinitionHints(searchString, _instructionTypes));
-
-            var result = new MessagingExtensionResponse
-            {
-                ComposeExtension = new MessagingExtensionResult
-                {
-                    
-                    AttachmentLayout = "list",
-                    Type = "result",
-                    Attachments = foundInstructionDefs.Instructions.Select(ToAttachment).ToList()
-                },
-            };
-            return Task.FromResult(result);
-
-        }
+        
 
         private static MessagingExtensionAttachment ToAttachment(InstructionHint instructionDefinition)
         {
@@ -395,65 +413,79 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                                 Size = AdaptiveTextSize.Large
                             },
                             new AdaptiveTextBlock(instructionDefinition.Description),
-                            new AdaptiveColumnSet
-                            {
 
-                                Columns = new List<AdaptiveColumn> {
-                                    new AdaptiveColumn()
-                                    {
-                                        Width = "auto",
-                                        VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
-                                        Items = new List<AdaptiveElement>
-                                            {
-                                            new AdaptiveActionSet()
-                                            {
-                                                Actions = new List<AdaptiveAction>
-                                                {
-                                                    new AdaptiveSubmitAction
-                                                    {
-                                                        Title = "Run"
-                                                    },
-                                                }
-                                            }
-                                        }
-                                    },
-                                    //new AdaptiveColumn
-                                    //{
-                                    //    Width = "auto",
-                                    //    VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
-                                    //    Items = new List<AdaptiveElement>
-                                    //    {
-                                    //        new AdaptiveTextBlock(" on ")
-                                    //    }
-                                    //},
-                                    //new AdaptiveColumn
-                                    //{
-                                    //    Width = "auto",
-                                    //    VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
-                                    //    Items = new List<AdaptiveElement>
-                                    //    {
-                                    //        new AdaptiveTextInput()
-                                    //        {
-                                    //            Value = _lastDevice ?? "",
-                                    //            Placeholder = _lastDevice == null ? "Enter FQDN" : null,
-                                    //        }
-                                    //    }
-                                    //}
-                                }
-                            }
+                            //new AdaptiveColumnSet
+                            //{
+
+                            //    Columns = new List<AdaptiveColumn> {
+                            //        new AdaptiveColumn()
+                            //        {
+                            //            Width = "auto",
+                            //            VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+                            //            Items = new List<AdaptiveElement>
+                            //                {
+                            //                new AdaptiveActionSet()
+                            //                {
+                            //                    Actions = new List<AdaptiveAction>
+                            //                    {
+                            //                        new AdaptiveSubmitAction
+                            //                        {
+                            //                            Title = "Run"
+                            //                        },
+                            //                    }
+                            //                }
+                            //            }
+                            //        },
+                            //        //new AdaptiveColumn
+                            //        //{
+                            //        //    Width = "auto",
+                            //        //    VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+                            //        //    Items = new List<AdaptiveElement>
+                            //        //    {
+                            //        //        new AdaptiveTextBlock(" on ")
+                            //        //    }
+                            //        //},
+                            //        //new AdaptiveColumn
+                            //        //{
+                            //        //    Width = "auto",
+                            //        //    VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
+                            //        //    Items = new List<AdaptiveElement>
+                            //        //    {
+                            //        //        new AdaptiveTextInput()
+                            //        //        {
+                            //        //            Value = _lastDevice ?? "",
+                            //        //            Placeholder = _lastDevice == null ? "Enter FQDN" : null,
+                            //        //        }
+                            //        //    }
+                            //        //}
+                            //    }
+                            //}
                         },
 
                     },
-                }
+                },
+                //Actions = new List<AdaptiveAction>
+                //{
+                //    new AdaptiveSubmitAction
+                //    {
+                //        Title = "Run",
+                //        Data =$"{{ \"msteams\": {{ \"type\": \"messageBack\", \"displayText\": \"Run\", \"text\": \"\", \"value\": \"{instructionDefinition.ReadableName}\" }} }}",
+                //    },
+                //}
             };
 
             return new MessagingExtensionAttachment
             {
-                ContentType = AdaptiveCard.ContentType,
+                ContentType = AdaptiveCard.ContentType ,
                 Content = content,
+                //ContentUrl = "https://www.1e.com/haha",
+                Properties = new JObject
+                {
+                    { "name1", "value1" },
+                    { "name2", "value2" }
+                },
                 Preview = preview.ToAttachment(),
             };
-
         }
 
         protected override Task<MessagingExtensionResponse> OnTeamsMessagingExtensionSelectItemAsync(ITurnContext<IInvokeActivity> turnContext, JObject query, CancellationToken cancellationToken)
