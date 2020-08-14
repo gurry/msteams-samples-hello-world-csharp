@@ -83,8 +83,6 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 var fqdn = parts[1];
 
-                await turnContext.SendActivityAsync(MessageFactory.Text("Getting device information from Tachyon..."), cancellationToken);
-
                 var device = await GetDeviceAsync(fqdn);
 
                 if (device == null)
@@ -97,10 +95,10 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 _lastDeviceQueried = fqdn;
 
-                await turnContext.SendActivityAsync(MessageFactory.Text("Here's what I found:"), cancellationToken);
+                await turnContext.SendActivityAsync(MessageFactory.Text("Here are the device details:"), cancellationToken);
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
 
-                await Task.Delay(1200);
+                await Task.Delay(900);
 
                 if (device.IsActive())
                 {
