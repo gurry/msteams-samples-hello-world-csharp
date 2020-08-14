@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Bot.Connector;
 using Microsoft.Bot.Connector.Authentication;
 using Microsoft.Bot.Schema;
+using Microsoft.VisualBasic;
 
 namespace Microsoft.Teams.Samples.HelloWorld.Web
 {
@@ -67,6 +68,14 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     new AdaptiveSubmitAction
                     {
                         Title = "Investigate",
+                        Data =  new AdaptiveCardAction
+                        {
+                            MsteamsCardAction = new CardAction
+                            {
+                                Type = Constants.MessageBackActionType,
+                                Text = $"info {ticket.Device}",
+                            },
+                        },
                     },
                     new AdaptiveSubmitAction
                     {
@@ -85,7 +94,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             reply.Attachments.Clear();
             reply.Attachments.Add(attachment);
 
-            await _connectorClient.Conversations.SendToConversationAsync(reply);
+            await _connectorClient.Conversations.SendToConversationAsync((Activity)reply);
 
             return Ok();
         }

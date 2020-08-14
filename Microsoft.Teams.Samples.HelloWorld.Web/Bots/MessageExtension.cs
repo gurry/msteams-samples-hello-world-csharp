@@ -65,7 +65,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             _reply = activity.CreateReply();
 
             turnContext.Activity.RemoveRecipientMention();
-            
+
             var text = turnContext.Activity.Text?.Trim().ToLower() ?? "";
 
             if (text.StartsWith("info "))
@@ -97,8 +97,15 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 _lastDeviceQueried = fqdn;
 
-                await turnContext.SendActivityAsync(MessageFactory.Text($"Here's what I found:"), cancellationToken);
+                await turnContext.SendActivityAsync(MessageFactory.Text("Here's what I found:"), cancellationToken);
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
+
+                await Task.Delay(1200);
+
+                if (device.IsActive())
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Text("The device is currently online. You can run instructions against it 👍 "), cancellationToken);
+                }
             }
             else if (text.StartsWith("select"))
             {
@@ -134,8 +141,9 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     _selectedDevice = null;
                 }
             }
-            else 
+            else
             {
+                _selectedDevice = _selectedDevice ?? _lastDeviceQueried;
                 if (_selectedDevice == null)
                 {
                     return;
@@ -179,6 +187,24 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
             }
+        }
+
+        protected override Task OnTeamsMessagingExtensionCardButtonClickedAsync(ITurnContext<IInvokeActivity> turnContext, JObject cardData,
+            CancellationToken cancellationToken)
+        {
+            return base.OnTeamsMessagingExtensionCardButtonClickedAsync(turnContext, cardData, cancellationToken);
+        }
+
+        protected override Task<MessagingExtensionActionResponse> OnTeamsMessagingExtensionSubmitActionDispatchAsync(ITurnContext<IInvokeActivity> turnContext, MessagingExtensionAction action,
+            CancellationToken cancellationToken)
+        {
+            return base.OnTeamsMessagingExtensionSubmitActionDispatchAsync(turnContext, action, cancellationToken);
+        }
+
+        protected override Task<MessagingExtensionActionResponse> OnTeamsMessagingExtensionSubmitActionAsync(ITurnContext<IInvokeActivity> turnContext, MessagingExtensionAction action,
+            CancellationToken cancellationToken)
+        {
+            return base.OnTeamsMessagingExtensionSubmitActionAsync(turnContext, action, cancellationToken);
         }
 
 
