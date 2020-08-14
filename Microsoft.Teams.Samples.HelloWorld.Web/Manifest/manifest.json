@@ -27,7 +27,7 @@
     {
         "entityId": "com.1e.demoapp.tickets",
       "contentUrl": "https://yourteamsapp.ngrok.io/hello",
-        "name": "Shopping",
+        "name": "My Tickets",
         "scopes": [
             "personal"
         ]
