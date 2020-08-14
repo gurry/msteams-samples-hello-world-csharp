@@ -139,9 +139,9 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     _selectedDevice = null;
                 }
             }
-            else
+            else if (!string.IsNullOrEmpty(text))
             {
-                _selectedDevice = _selectedDevice ?? _lastDeviceQueried;
+                _selectedDevice ??= _lastDeviceQueried;
                 if (_selectedDevice == null)
                 {
                     return;
@@ -150,14 +150,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
 
                 InstructionHint instruction = null;
-                if (!string.IsNullOrEmpty(text))
-                {
                     instruction = _instructionDefs.Search(text).FirstOrDefault();
-                }
-                else if (_lastReturnedInstructions != null && _lastReturnedInstructions.Count > 0)
-                {
-                    instruction = _lastReturnedInstructions[0];
-                }
 
                 if (instruction == null)
                 {
