@@ -14,6 +14,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AdaptiveCards;
+using Microsoft.Bot.Connector;
 using Microsoft.Bot.Connector.Authentication;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Configuration;
@@ -42,6 +43,8 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
         private static string _selectedDevice;
         private readonly InstructionDefinitions _instructionDefs;
         private static string _lastDeviceQueried;
+        public static ConnectorClient _connectorClient = new ConnectorClient(new Uri("https://smba.trafficmanager.net/in/"), new MicrosoftAppCredentials("2ea52b84-e497-4bcb-8b5d-9670b57c2915", "-a6Sd~nx~a8vXs3Z820L_t9m3JluvFVl1-"));
+        public static Activity _reply;
 
         private static IList<InstructionHint> _lastReturnedInstructions;
 
@@ -58,8 +61,11 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
         protected override async Task OnMessageActivityAsync(ITurnContext<IMessageActivity> turnContext, CancellationToken cancellationToken)
         {
-            turnContext.Activity.RemoveRecipientMention();
+            var activity = turnContext.Activity as Activity;
+            _reply = activity.CreateReply();
 
+            turnContext.Activity.RemoveRecipientMention();
+            
             var text = turnContext.Activity.Text?.Trim().ToLower() ?? "";
 
             if (text.StartsWith("info "))
