@@ -64,6 +64,8 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
             if (text.StartsWith("info "))
             {
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+
                 var parts = text.Split();
                 if (parts.Length != 2)
                 {
@@ -94,6 +96,8 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             }
             else if (text.StartsWith("select"))
             {
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+
                 var parts = text.Split();
                 string selectedDevice = null;
                 if (parts.Length == 1)
@@ -131,6 +135,8 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     return;
                 }
 
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+
                 InstructionHint instruction = null;
                 if (!string.IsNullOrEmpty(text))
                 {
@@ -149,6 +155,9 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 await turnContext.SendActivityAsync(MessageFactory.Text($"Running instruction '{instruction.ReadableName}'..."), cancellationToken);
                 IEnumerable<Response> responses;
+
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+
                 try
                 {
                     responses = RunInstruction(instruction.Id, _selectedDevice);
@@ -577,6 +586,14 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     }
                 },
             });
+        }
+
+        private static Activity CreateTypingActivity(ITurnContext<IMessageActivity> turnContext)
+        {
+            var activity = turnContext.Activity as Activity;
+            var reply = activity.CreateReply();
+            reply.Type = ActivityTypes.Typing;
+            return reply;
         }
     }
 }
