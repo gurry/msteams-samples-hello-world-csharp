@@ -68,7 +68,11 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
             var text = turnContext.Activity.Text?.Trim().ToLower() ?? "";
 
-            if (text.StartsWith("info "))
+            if (text.StartsWith("testing"))
+            {
+                return;
+            }
+            else if (text.StartsWith("info "))
             {
                 await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
 
