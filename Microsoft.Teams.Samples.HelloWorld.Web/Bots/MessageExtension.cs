@@ -102,7 +102,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 await turnContext.SendActivityAsync(MessageFactory.Text("Here are the device details:"), cancellationToken);
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
 
-                await Task.Delay(900);
+                await Task.Delay(600);
 
                 if (device.IsActive())
                 {
@@ -157,6 +157,15 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             }
             else if (!string.IsNullOrEmpty(text))
             {
+                const string prefix = "running instruction '";
+                var fromRunButton = false;
+                if (text.StartsWith(prefix))
+                {
+                    fromRunButton = true;
+                    text = text.Replace(prefix, "");
+                    text = text.Split('\'')[0];
+                }
+
                 _selectedDevice ??= _lastDeviceQueried;
                 if (_selectedDevice == null)
                 {
@@ -166,7 +175,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
 
                 InstructionHint instruction = null;
-                    instruction = _instructionDefs.Search(text).FirstOrDefault();
+                instruction = _instructionDefs.Search(text).FirstOrDefault();
 
                 if (instruction == null)
                 {
@@ -174,7 +183,12 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     return;
                 }
 
-                await turnContext.SendActivityAsync(MessageFactory.Text($"Running instruction '{instruction.ReadableName}'..."), cancellationToken);
+                if (!fromRunButton)
+                {
+                    await turnContext.SendActivityAsync(
+                        MessageFactory.Text($"Running instruction '{instruction.ReadableName}'..."), cancellationToken);
+                }
+
                 IEnumerable<Response> responses;
 
                 await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
@@ -566,77 +580,31 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                                 Size = AdaptiveTextSize.Large
                             },
                             new AdaptiveTextBlock(instructionDefinition.Description),
-
-                            //new AdaptiveColumnSet
-                            //{
-
-                            //    Columns = new List<AdaptiveColumn> {
-                            //        new AdaptiveColumn()
-                            //        {
-                            //            Width = "auto",
-                            //            VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
-                            //            Items = new List<AdaptiveElement>
-                            //                {
-                            //                new AdaptiveActionSet()
-                            //                {
-                            //                    Actions = new List<AdaptiveAction>
-                            //                    {
-                            //                        new AdaptiveSubmitAction
-                            //                        {
-                            //                            Title = "Run"
-                            //                        },
-                            //                    }
-                            //                }
-                            //            }
-                            //        },
-                            //        //new AdaptiveColumn
-                            //        //{
-                            //        //    Width = "auto",
-                            //        //    VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
-                            //        //    Items = new List<AdaptiveElement>
-                            //        //    {
-                            //        //        new AdaptiveTextBlock(" on ")
-                            //        //    }
-                            //        //},
-                            //        //new AdaptiveColumn
-                            //        //{
-                            //        //    Width = "auto",
-                            //        //    VerticalContentAlignment = AdaptiveVerticalContentAlignment.Center,
-                            //        //    Items = new List<AdaptiveElement>
-                            //        //    {
-                            //        //        new AdaptiveTextInput()
-                            //        //        {
-                            //        //            Value = _lastDevice ?? "",
-                            //        //            Placeholder = _lastDevice == null ? "Enter FQDN" : null,
-                            //        //        }
-                            //        //    }
-                            //        //}
-                            //    }
-                            //}
                         },
-
                     },
                 },
-                //Actions = new List<AdaptiveAction>
-                //{
-                //    new AdaptiveSubmitAction
-                //    {
-                //        Title = "Run",
-                //        Data =$"{{ \"msteams\": {{ \"type\": \"messageBack\", \"displayText\": \"Run\", \"text\": \"\", \"value\": \"{instructionDefinition.ReadableName}\" }} }}",
-                //    },
-                //}
+                Actions = new List<AdaptiveAction>
+                {
+                    new AdaptiveSubmitAction
+                    {
+                        Title = "Run",
+                        Data =  new AdaptiveCardAction
+                        {
+                            MsteamsCardAction = new CardAction
+                            {
+                                Type = "imBack",
+                                Text = $"Running instruction '{instructionDefinition.ReadableName}'...",
+                                Value = $"Running instruction '{instructionDefinition.ReadableName}'...",
+                            }
+                        },
+                    },
+                }
             };
-
+            
             return new MessagingExtensionAttachment
             {
-                ContentType = AdaptiveCard.ContentType ,
+                ContentType = AdaptiveCard.ContentType,
                 Content = content,
-                //ContentUrl = "https://www.1e.com/haha",
-                Properties = new JObject
-                {
-                    { "name1", "value1" },
-                    { "name2", "value2" }
-                },
                 Preview = preview.ToAttachment(),
             };
         }
