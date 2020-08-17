@@ -79,6 +79,18 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     },
                     new AdaptiveSubmitAction
                     {
+                        Title = "Check User availability",
+                        Data =  new AdaptiveCardAction
+                        {
+                            MsteamsCardAction = new CardAction
+                            {
+                                Type = Constants.MessageBackActionType,
+                                Text = $"availability",
+                            },
+                        },
+                    },
+                    new AdaptiveSubmitAction
+                    {
                         Title = "Call user"
                     },
                 }

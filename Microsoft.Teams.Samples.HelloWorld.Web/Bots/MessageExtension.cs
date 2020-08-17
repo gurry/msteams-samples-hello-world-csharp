@@ -143,6 +143,18 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     _selectedDevice = null;
                 }
             }
+            else if (text.StartsWith("availability"))
+            {
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+                await Task.Delay(600);
+
+                var card = CreateUserScheduleCard();
+
+                await turnContext.SendActivityAsync(MessageFactory.Text("User is available at these times today:"), cancellationToken);
+
+                await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
+
+            }
             else if (!string.IsNullOrEmpty(text))
             {
                 _selectedDevice ??= _lastDeviceQueried;
@@ -182,6 +194,38 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
             }
+        }
+
+        private static Attachment CreateUserScheduleCard()
+        {
+            var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
+            {
+                Body = new List<AdaptiveElement>
+                {
+                    new AdaptiveContainer
+                    {
+                        Items = new List<AdaptiveElement>
+                        {
+                            new AdaptiveTextBlock("From **1:30PM** to **2:30PM**"),
+                            new AdaptiveTextBlock("From **5:00PM** to **4:30PM**"),
+                        }
+                    }
+                },
+                Actions = new List<AdaptiveAction>
+                {
+                    new AdaptiveSubmitAction
+                    {
+                        Title = "Schedule a Meeting",
+                    },
+                }
+            };
+
+            var attachment = new Attachment
+            {
+                ContentType = AdaptiveCard.ContentType,
+                Content = card,
+            };
+            return attachment;
         }
 
         protected override Task OnTeamsMessagingExtensionCardButtonClickedAsync(ITurnContext<IInvokeActivity> turnContext, JObject cardData,
