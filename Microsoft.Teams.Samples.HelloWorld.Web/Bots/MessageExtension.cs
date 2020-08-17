@@ -183,7 +183,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
         protected override Task OnTeamsMessagingExtensionCardButtonClickedAsync(ITurnContext<IInvokeActivity> turnContext, JObject cardData,
             CancellationToken cancellationToken)
         {
-            return base.OnTeamsMessagingExtensionCardButtonClickedAsync(turnContext, cardData, cancellationToken);
+            return Task.CompletedTask;
         }
 
         protected override Task<MessagingExtensionActionResponse> OnTeamsMessagingExtensionSubmitActionDispatchAsync(ITurnContext<IInvokeActivity> turnContext, MessagingExtensionAction action,
