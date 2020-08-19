@@ -42,6 +42,11 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web.Bots
 
         public static IList<InstructionHint> Search(this InstructionDefinitions defs, string searchString)
         {
+            if (searchString.Length < 3) // must be at least three chars for tachyon to return anything
+            {
+                return new List<InstructionHint>();
+            }
+
             var result = MakeTachyonCall(() => defs.GetInstructionDefinitionHints(searchString, InstructionTypes));
             if (result.Result != InstructionHintSearchResult.Successful || result.Error?.Length > 0)
             {
