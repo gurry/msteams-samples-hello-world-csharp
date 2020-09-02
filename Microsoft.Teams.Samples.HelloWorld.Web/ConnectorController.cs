@@ -16,6 +16,59 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
     public class ConnectorController : ControllerBase
     {
         static ConnectorClient _connectorClient = new ConnectorClient(new Uri("https://smba.trafficmanager.net/in/"), new MicrosoftAppCredentials("2ea52b84-e497-4bcb-8b5d-9670b57c2915", "-a6Sd~nx~a8vXs3Z820L_t9m3JluvFVl1-"));
+
+        private static string deviceName = "Client2.NTL.local";
+
+        private static IDictionary<string, string> commonUserActions = new Dictionary<string, string>
+        {
+            { "Check User availability", "availability" },
+            { "Call User", "" },
+        };
+
+        private static List<Ticket> tickets = new List<Ticket>
+        {
+            new Ticket
+            {
+                Title = "Cannot log in",
+                Message = "Hi, I cannot log into into my office workstation. Can you please hel...",
+                Device = deviceName,
+                User = "Sam Gibson",
+                TicketActions = new Dictionary<string, string>
+                {
+                    { "Reset password", "resetpassword" },
+                    { "Get Device Details", $"info {deviceName}" },
+                    { "Run Tachyon Instructions", $"select {deviceName}" },
+                },
+                UserActions = commonUserActions,
+            },
+            new Ticket
+            {
+                Title = "VPN not working",
+                Message = "Hi BizTech, I'm having problem connecting to my office machine. The VPN stay in conn...",
+                Device = deviceName,
+                User = "Paul Harper",
+                TicketActions = new Dictionary<string, string>
+                {
+                    { "Get Connectivity Report", "connectivity" },
+                    { "Get Device Details", $"info {deviceName}" },
+                    { "Run Tachyon Instructions", $"select {deviceName}" },
+                },
+                UserActions = commonUserActions,
+            },
+            new Ticket
+            {
+                Title = "Leaver offboarding",
+                Message = "Can you please start the offboarding process for Adam Pierce? Thanks",
+                Device = deviceName,
+                User = "Ravi Kant",
+                TicketActions = new Dictionary<string, string>
+                {
+                    { "Kiff-off Offboaring Workflow", "offboarding" },
+                },
+                UserActions = commonUserActions,
+            }
+        };
+
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] Ticket ticket)
         {
@@ -60,6 +113,40 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             return Ok();
         }
 
+        [HttpPost("{index}")]
+        public async Task<IActionResult> RaisedCannedTicket(int index)
+        {
+            if (index >= tickets.Count)
+            {
+                return NotFound();
+            }
+
+            var reply = MessageExtension._reply;
+
+
+            var ticket = tickets[index];
+            reply.Text = "A new ticket has been assigned to you:";
+            var attachment = CreateTicketCard(ticket.Title, ticket.Message, ticket.Device, ticket.User);
+
+            reply.Attachments.Clear();
+            reply.Attachments.Add(attachment);
+
+            await _connectorClient.Conversations.SendToConversationAsync(reply);
+
+
+            await Task.Delay(800);
+
+
+            reply.Text = "Here are some actions to help resolve this ticket:";
+            var attachment2 = CreateActionCard(ticket.TicketActions, ticket.UserActions);
+
+            reply.Attachments.Clear();
+            reply.Attachments.Add(attachment2);
+
+            await _connectorClient.Conversations.SendToConversationAsync(reply);
+
+            return Ok();
+        }
         private static Attachment CreateTicketCard(string ticketTitle, string ticketDescription, string deviceName, string userName)
         {
             var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
@@ -73,7 +160,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                             new AdaptiveTextBlock(ticketTitle)
                             {
                                 Weight = AdaptiveTextWeight.Bolder,
-                                Size = AdaptiveTextSize.ExtraLarge
+                                Size = AdaptiveTextSize.Large
                             },
                             new AdaptiveTextBlock(ticketDescription),
                             new AdaptiveFactSet()
@@ -158,5 +245,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
         public string Message { get; set; }
         public string User { get; set; }
         public string Device { get; set; }
+        public IDictionary<string, string> TicketActions;
+        public IDictionary<string, string> UserActions;
     }
 }
