@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using AdaptiveCards;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +29,39 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
             var reply = MessageExtension._reply;
 
+
             reply.Text = "A new ticket has been assigned to you:";
+            var attachment = CreateTicketCard(ticket.Title, ticket.Message, ticket.Device, ticket.User);
+
+            reply.Attachments.Clear();
+            reply.Attachments.Add(attachment);
+
+            await _connectorClient.Conversations.SendToConversationAsync(reply);
+
+
+            await Task.Delay(800);
+
+
+            reply.Text = "Here are some actions to help resolve this ticket:";
+            var attachment2 = CreateActionCard(new Dictionary<string, string>
+            {
+                { "Run Instructions", $"info {ticket.Device}" },
+            }, new Dictionary<string, string>
+            {
+                { "Check User availability", "availability" },
+                { "Call User", "" },
+            });
+
+            reply.Attachments.Clear();
+            reply.Attachments.Add(attachment2);
+
+            await _connectorClient.Conversations.SendToConversationAsync(reply);
+
+            return Ok();
+        }
+
+        private static Attachment CreateTicketCard(string ticketTitle, string ticketDescription, string deviceName, string userName)
+        {
             var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
             {
                 Body = new List<AdaptiveElement>
@@ -37,78 +70,85 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     {
                         Items = new List<AdaptiveElement>
                         {
-                            new AdaptiveTextBlock(ticket.Title)
+                            new AdaptiveTextBlock(ticketTitle)
                             {
                                 Weight = AdaptiveTextWeight.Bolder,
-                                Size = AdaptiveTextSize.Large
+                                Size = AdaptiveTextSize.ExtraLarge
                             },
-                            new AdaptiveTextBlock(ticket.Message),
+                            new AdaptiveTextBlock(ticketDescription),
                             new AdaptiveFactSet()
                             {
-
                                 Facts = new List<AdaptiveFact>
                                 {
                                     new AdaptiveFact
                                     {
                                         Title = "Device",
-                                        Value = ticket.Device
+                                        Value = deviceName
                                     },
                                     new AdaptiveFact
                                     {
                                         Title = "User",
-                                        Value = ticket.User
+                                        Value = userName
                                     }
                                 }
                             },
                         }
                     }
                 },
-                Actions = new List<AdaptiveAction>
-                {
-                    new AdaptiveSubmitAction
-                    {
-                        Title = "Investigate",
-                        Data =  new AdaptiveCardAction
-                        {
-                            MsteamsCardAction = new CardAction
-                            {
-                                Type = Constants.MessageBackActionType,
-                                Text = $"info {ticket.Device}",
-                            },
-                        },
-                    },
-                    new AdaptiveSubmitAction
-                    {
-                        Title = "Check User availability",
-                        Data =  new AdaptiveCardAction
-                        {
-                            MsteamsCardAction = new CardAction
-                            {
-                                Type = Constants.MessageBackActionType,
-                                Text = $"availability",
-                            },
-                        },
-                    },
-                    new AdaptiveSubmitAction
-                    {
-                        Title = "Call user"
-                    },
-                }
-
             };
-            var attachment = new Attachment
+
+            return new Attachment
             {
                 ContentType = AdaptiveCard.ContentType,
                 Content = card,
-                
+            };
+        }
+
+        private static Attachment CreateActionCard(IDictionary<string, string> ticketActions, IDictionary<string, string> userActions)
+        {
+            static AdaptiveActionSet ToAdaptiveActionSet(IDictionary<string, string> actions)
+            {
+                return  new AdaptiveActionSet
+                {
+                    Actions = actions.Select(ta => new AdaptiveSubmitAction
+                    {
+                        Title = ta.Key,
+                        Data = new AdaptiveCardAction
+                        {
+                            MsteamsCardAction = new CardAction
+                            {
+                                Type = Constants.MessageBackActionType,
+                                Text = ta.Value,
+                            },
+                        },
+                    }).Cast<AdaptiveAction>().ToList()
+                };
+            }
+
+            var ticketActionSet = ToAdaptiveActionSet(ticketActions);
+            var userActionSet = ToAdaptiveActionSet(userActions);
+            userActionSet.Spacing = AdaptiveSpacing.Large;
+
+            var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
+            {
+                Body = new List<AdaptiveElement>
+                {
+                    new AdaptiveContainer
+                    {
+                        Items = new List<AdaptiveElement>
+                        {
+                            ticketActionSet,
+                            userActionSet
+                        }
+                    },
+                },
             };
 
-            reply.Attachments.Clear();
-            reply.Attachments.Add(attachment);
-
-            await _connectorClient.Conversations.SendToConversationAsync((Activity)reply);
-
-            return Ok();
+            return new Attachment
+            {
+                ContentType = AdaptiveCard.ContentType,
+                Content = card,
+            };
         }
     }
 
