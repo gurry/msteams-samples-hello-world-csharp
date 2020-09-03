@@ -103,10 +103,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 await turnContext.SendActivityAsync(MessageFactory.Text("Here are the device details:"), cancellationToken);
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
 
-                await Task.Delay(600);
-
-
-                await Task.Delay(500);
+                await Task.Delay(1000);
                 var actionCard = ConnectorController.CreateSelectedTicketActionCard();
                 if (actionCard != null)
                 {
@@ -150,7 +147,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 if (device.IsActive())
                 {
-                    await turnContext.SendActivityAsync(MessageFactory.Text("The device is currently online. You can run instructions against it 👍 "), cancellationToken);
+                    await turnContext.SendActivityAsync(MessageFactory.Text("The device is currently online. You can run instructions against it by typing them here 👍 "), cancellationToken);
                 }
                 else
                 {
@@ -223,7 +220,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 await Task.Delay(200);
                 await turnContext.SendActivityAsync(MessageFactory.Text($"Checking connectivity on device {deviceName}..."), cancellationToken);
 
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < 4; i++)
                 {
                     await Task.Delay(2000);
                     await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
@@ -234,9 +231,13 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 var card = CreateConnectivityReportCard(deviceName);
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
                 await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
-                await Task.Delay(500);
+
+                await Task.Delay(1000);
                 var actionCard = ConnectorController.CreateSelectedTicketActionCard();
-                await turnContext.SendActivityAsync(MessageFactory.Attachment(actionCard), cancellationToken);
+                if (actionCard != null)
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Attachment(actionCard), cancellationToken);
+                }
             }
             else if (text.StartsWith("offboard"))
             {
@@ -313,6 +314,13 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 var card = ToInstructionResultCard(responses);
 
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
+
+                await Task.Delay(1000);
+                var actionCard = ConnectorController.CreateSelectedTicketActionCard();
+                if (actionCard != null)
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Attachment(actionCard), cancellationToken);
+                }
             }
         }
 
