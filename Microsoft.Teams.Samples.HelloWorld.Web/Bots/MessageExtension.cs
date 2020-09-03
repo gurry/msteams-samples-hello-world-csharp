@@ -66,7 +66,8 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
             turnContext.Activity.RemoveRecipientMention();
 
-            var text = turnContext.Activity.Text?.Trim().ToLower() ?? "";
+            var originalText = turnContext.Activity.Text?.Trim();
+            var text = originalText.ToLower() ?? "";
 
             if (text.StartsWith("testing"))
             {
@@ -104,9 +105,12 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 await Task.Delay(600);
 
-                if (device.IsActive())
+
+                await Task.Delay(500);
+                var actionCard = ConnectorController.CreateSelectedTicketActionCard();
+                if (actionCard != null)
                 {
-                    await turnContext.SendActivityAsync(MessageFactory.Text("The device is currently online. You can run instructions against it 👍 "), cancellationToken);
+                    await turnContext.SendActivityAsync(MessageFactory.Attachment(actionCard), cancellationToken);
                 }
             }
             else if (text.StartsWith("select"))
@@ -132,8 +136,26 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     return;
                 }
 
+
                 _selectedDevice = selectedDevice;
-                await turnContext.SendActivityAsync(MessageFactory.Text($"Device '{_selectedDevice}' selected ✔. Any instructions you enter will run against it."), cancellationToken);
+
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+                var device = await GetDeviceAsync(_selectedDevice);
+
+                if (device == null)
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Text($"Sorry, could not find any information about '{_selectedDevice}' ☹"), cancellationToken);
+                    return;
+                }
+
+                if (device.IsActive())
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Text("The device is currently online. You can run instructions against it 👍 "), cancellationToken);
+                }
+                else
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Text("Can't run instructions. The device is currently offline"), cancellationToken);
+                }
             }
             else if (text== "unselect")
             {
@@ -154,6 +176,90 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
 
+            }
+            else if (text.StartsWith("unlockaccount"))
+            {
+                var username = originalText.Remove(0, "unlockaccount".Length).Trim();
+
+                if (string.IsNullOrWhiteSpace(username))
+                {
+                    _logger.LogError("Bad syntax. Missing user name");
+                    await turnContext.SendActivityAsync(MessageFactory.Text("Bad syntax. Missing user name"), cancellationToken);
+                    return;
+                }
+                
+
+
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+
+                await Task.Delay(200);
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Unlocking account of user {username}..."), cancellationToken);
+
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+                await Task.Delay(1500);
+                await turnContext.SendActivityAsync(MessageFactory.Text("Unlocked account and notified the user ✔"), cancellationToken);
+
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+
+                await Task.Delay(200);
+                var closeTicketCard = CreateTicketCloseCard();
+                await turnContext.SendActivityAsync(MessageFactory.Attachment(closeTicketCard), cancellationToken);
+
+            }
+            else if (text.StartsWith("connectivity"))
+            {
+                var deviceName = originalText.Remove(0, "connectivity".Length).Trim();
+
+                if (string.IsNullOrWhiteSpace(deviceName))
+                {
+                    _logger.LogError("Bad syntax. Missing device name");
+                    await turnContext.SendActivityAsync(MessageFactory.Text("Bad syntax. Missing device name"), cancellationToken);
+                    return;
+                }
+                
+
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+
+                await Task.Delay(200);
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Checking connectivity on device {deviceName}..."), cancellationToken);
+
+                for (int i = 0; i < 5; i++)
+                {
+                    await Task.Delay(2000);
+                    await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+                }
+
+                await Task.Delay(200);
+
+                var card = CreateConnectivityReportCard(deviceName);
+                await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+                await Task.Delay(500);
+                var actionCard = ConnectorController.CreateSelectedTicketActionCard();
+                await turnContext.SendActivityAsync(MessageFactory.Attachment(actionCard), cancellationToken);
+            }
+            else if (text.StartsWith("offboard"))
+            {
+                var leaverName = originalText.Remove(0, "offboard".Length).Trim();
+
+                if (string.IsNullOrWhiteSpace(leaverName))
+                {
+                    _logger.LogError("Bad syntax. Missing leaver name");
+                    await turnContext.SendActivityAsync(MessageFactory.Text("Bad syntax. Missing leaver name"), cancellationToken);
+                    return;
+                }
+
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Starting offboarding process for {leaverName}..."), cancellationToken);
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+                await Task.Delay(200);
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Sent a request to John Ingram, manager of {leaverName}, to approve offboarding"), cancellationToken);
+            }
+            else if (text.StartsWith("closeticket"))
+            {
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+
+                await Task.Delay(300);
+                await turnContext.SendActivityAsync(MessageFactory.Text("Ticket closed 👍"), cancellationToken);
             }
             else if (!string.IsNullOrEmpty(text))
             {
@@ -532,7 +638,104 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 Content = card,
             };
         }
+        private Attachment CreateConnectivityReportCard(string deviceName)
+        {
+            var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
+            {
+                Body = new List<AdaptiveElement>
+                {
+                    new AdaptiveContainer
+                    {
+                        Items = new List<AdaptiveElement>
+                        {
+                            new AdaptiveTextBlock($"Connectivity report for {deviceName}")
+                            {
+                                Weight = AdaptiveTextWeight.Bolder, 
+                                Size = AdaptiveTextSize.Large
+                            },
+                            new AdaptiveFactSet
+                            {
+                                Facts = new List<AdaptiveFact>
+                                {
+                                    new AdaptiveFact("Internet (8.8.8.8):", "4ms RTT"),
+                                    new AdaptiveFact("Confluence:", "112ms RTT"),
+                                    new AdaptiveFact("TFS:", "105ms RTT"),
+                                    new AdaptiveFact("UK Gateway:", "96ms RTT"),
+                                    new AdaptiveFact("UK VPN NAS:", "101ms RTT"),
+                                    new AdaptiveFact("India Gateway:", "7ms RTT"),
+                                    new AdaptiveFact("India VPN NAS:", "Unreachable"),
+                                }
+                            },
+                            new AdaptiveTextBlock("Network interfaces:")
+                            {
+                                Spacing =  AdaptiveSpacing.Large,
+                                Separator = true,
+                            },
+                            new AdaptiveFactSet
+                            {
+                                Facts = new List<AdaptiveFact>
+                                {
+                                    new AdaptiveFact("Ethernet", "--, Physical, Ethernet, Disconnected"),
+                                    new AdaptiveFact("WiFi", "10.1.1.13, Physical, Wifi, Connected"),
+                                    new AdaptiveFact("Tunnel adapter Microsoft IP-HTTPS", "10.1.1.13, Physical, Wifi, Disconnected")
+                                }
+                            }
+                        }
+                    },
+                }
+            };
 
+
+            return new Attachment
+            {
+                ContentType = AdaptiveCard.ContentType,
+                Content = card,
+                
+            };
+        }
+        private Attachment CreateTicketCloseCard()
+        {
+            var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
+            {
+                Body = new List<AdaptiveElement>
+                {
+                    new AdaptiveContainer
+                    {
+                        Items = new List<AdaptiveElement>
+                        {
+                            new AdaptiveTextBlock("Do you want to close the ticket?")
+                            {
+                                Weight = AdaptiveTextWeight.Bolder, 
+                                Size = AdaptiveTextSize.Large
+                            },
+                        }
+                    },
+                },
+                Actions = new List<AdaptiveAction>
+                {
+                    new AdaptiveSubmitAction
+                    {
+                        Title = "Yes, close it",
+                        Data =  new AdaptiveCardAction
+                        {
+                            MsteamsCardAction = new CardAction
+                            {
+                                Type = Constants.MessageBackActionType,
+                                Text = $"closeticket",
+                            }
+                        },
+                    },
+                }
+            };
+
+
+            return new Attachment
+            {
+                ContentType = AdaptiveCard.ContentType,
+                Content = card,
+                
+            };
+        }
         private async Task<HttpResponseMessage> CallTachyon(HttpMethod method, string urlPath, string body = null)
         {
             var request = new HttpRequestMessage(method, $"http://{_tachyonHostName}/{urlPath}");
@@ -627,7 +830,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             });
         }
 
-        private static Activity CreateTypingActivity(ITurnContext<IMessageActivity> turnContext)
+        public static Activity CreateTypingActivity(ITurnContext<IMessageActivity> turnContext)
         {
             var activity = turnContext.Activity as Activity;
             var reply = activity.CreateReply();

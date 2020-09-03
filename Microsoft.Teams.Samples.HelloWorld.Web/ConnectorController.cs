@@ -17,6 +17,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
     {
         static ConnectorClient _connectorClient = new ConnectorClient(new Uri("https://smba.trafficmanager.net/in/"), new MicrosoftAppCredentials("2ea52b84-e497-4bcb-8b5d-9670b57c2915", "-a6Sd~nx~a8vXs3Z820L_t9m3JluvFVl1-"));
 
+        public static Ticket SelectedTicket = null;
         private static string deviceName = "Client2.NTL.local";
 
         private static IDictionary<string, string> commonUserActions = new Dictionary<string, string>
@@ -35,7 +36,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 User = "Sam Gibson",
                 TicketActions = new Dictionary<string, string>
                 {
-                    { "Reset password", "resetpassword" },
+                    { "Unlock Account", "unlockaccount Sam Gibson" },
                     { "Get Device Details", $"info {deviceName}" },
                     { "Run Tachyon Instructions", $"select {deviceName}" },
                 },
@@ -49,7 +50,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 User = "Paul Harper",
                 TicketActions = new Dictionary<string, string>
                 {
-                    { "Get Connectivity Report", "connectivity" },
+                    { "Get Connectivity Report", $"connectivity {deviceName}" },
                     { "Get Device Details", $"info {deviceName}" },
                     { "Run Tachyon Instructions", $"select {deviceName}" },
                 },
@@ -63,7 +64,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 User = "Ravi Kant",
                 TicketActions = new Dictionary<string, string>
                 {
-                    { "Kiff-off Offboaring Workflow", "offboarding" },
+                    { "Kick off Offboarding Workflow", "offboard Adam Pierce" },
                 },
                 UserActions = commonUserActions,
             }
@@ -125,6 +126,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
 
             var ticket = tickets[index];
+            SelectedTicket = ticket;
             reply.Type = ActivityTypes.Message;
             reply.Text = "A new ticket has been assigned to you:";
             var attachment = CreateTicketCard(ticket.Title, ticket.Message, ticket.Device, ticket.User);
@@ -229,6 +231,11 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                     {
                         Items = new List<AdaptiveElement>
                         {
+                            new AdaptiveTextBlock("Ticket Actions")
+                            {
+                                Size = AdaptiveTextSize.Large,
+                                Weight = AdaptiveTextWeight.Bolder,
+                            },
                             ticketActionSet,
                             userActionSet
                         }
@@ -241,6 +248,17 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 ContentType = AdaptiveCard.ContentType,
                 Content = card,
             };
+        }
+
+
+        public static Attachment CreateSelectedTicketActionCard()
+        {
+            if (SelectedTicket != null)
+            {
+                return CreateActionCard(SelectedTicket.TicketActions, SelectedTicket.UserActions);
+            }
+
+            return null;
         }
     }
 
