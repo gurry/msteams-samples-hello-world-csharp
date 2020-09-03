@@ -125,6 +125,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
 
             var ticket = tickets[index];
+            reply.Type = ActivityTypes.Message;
             reply.Text = "A new ticket has been assigned to you:";
             var attachment = CreateTicketCard(ticket.Title, ticket.Message, ticket.Device, ticket.User);
 
@@ -133,10 +134,14 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
             await _connectorClient.Conversations.SendToConversationAsync(reply);
 
+            reply.Type = ActivityTypes.Typing;
+            reply.Text = null;
+            await _connectorClient.Conversations.SendToConversationAsync(reply);
 
-            await Task.Delay(800);
+            await Task.Delay(600);
 
 
+            reply.Type = ActivityTypes.Message;
             reply.Text = "Here are some actions to help resolve this ticket:";
             var attachment2 = CreateActionCard(ticket.TicketActions, ticket.UserActions);
 
