@@ -51,6 +51,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 TicketActions = new Dictionary<string, string>
                 {
                     { "Get Connectivity Report", $"connectivity {deviceName}" },
+                    { "Get VPN Health Status", $"vpnstatus {deviceName}" },
                     { "Get Device Details", $"info {deviceName}" },
                     { "Run Tachyon Instructions", $"select {deviceName}" },
                 },
@@ -58,13 +59,13 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             },
             new Ticket
             {
-                Title = "Leaver offboarding",
-                Message = "Can you please start the offboarding process for Adam Pierce? Thanks",
+                Title = "New Employee",
+                Message = "Can you please start the onboarding process for Adam Pierce? Thanks",
                 Device = deviceName,
                 User = "Ravi Kant",
                 TicketActions = new Dictionary<string, string>
                 {
-                    { "Kick off Offboarding Workflow", "offboard Adam Pierce" },
+                    { "Kick off Onboarding Workflow", "onboard Adam Pierce" },
                 },
                 UserActions = commonUserActions,
             }
@@ -154,6 +155,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
             return Ok();
         }
+
         private static Attachment CreateTicketCard(string ticketTitle, string ticketDescription, string deviceName, string userName)
         {
             var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))

@@ -67,6 +67,11 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
             turnContext.Activity.RemoveRecipientMention();
 
             var originalText = turnContext.Activity.Text?.Trim();
+            if (originalText == null)
+            {
+                return;
+            }
+
             var text = originalText.ToLower() ?? "";
 
             if (text.StartsWith("testing"))
@@ -103,7 +108,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 await turnContext.SendActivityAsync(MessageFactory.Text("Here are the device details:"), cancellationToken);
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
 
-                await Task.Delay(1000);
+                await Task.Delay(2000);
                 var actionCard = ConnectorController.CreateSelectedTicketActionCard();
                 if (actionCard != null)
                 {
@@ -222,7 +227,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 for (int i = 0; i < 4; i++)
                 {
-                    await Task.Delay(2000);
+                    await Task.Delay(1500);
                     await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
                 }
 
@@ -232,28 +237,54 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
                 await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
 
-                await Task.Delay(1000);
+                await Task.Delay(2000);
                 var actionCard = ConnectorController.CreateSelectedTicketActionCard();
                 if (actionCard != null)
                 {
                     await turnContext.SendActivityAsync(MessageFactory.Attachment(actionCard), cancellationToken);
                 }
             }
-            else if (text.StartsWith("offboard"))
+            else if (text.StartsWith("vpnstatus"))
             {
-                var leaverName = originalText.Remove(0, "offboard".Length).Trim();
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
 
-                if (string.IsNullOrWhiteSpace(leaverName))
+                await Task.Delay(200);
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Getting VPN server health report..."), cancellationToken);
+
+                for (int i = 0; i < 4; i++)
+                {
+                    await Task.Delay(1500);
+                    await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+                }
+
+                await Task.Delay(200);
+
+                var card = CreateVpnHealthCard();
+                await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
+                await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
+
+                await Task.Delay(2000);
+                var actionCard = ConnectorController.CreateSelectedTicketActionCard();
+                if (actionCard != null)
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Attachment(actionCard), cancellationToken);
+                }
+            }
+            else if (text.StartsWith("onboard"))
+            {
+                var newJoiner = originalText.Remove(0, "onboard".Length).Trim();
+
+                if (string.IsNullOrWhiteSpace(newJoiner))
                 {
                     _logger.LogError("Bad syntax. Missing leaver name");
                     await turnContext.SendActivityAsync(MessageFactory.Text("Bad syntax. Missing leaver name"), cancellationToken);
                     return;
                 }
 
-                await turnContext.SendActivityAsync(MessageFactory.Text($"Starting offboarding process for {leaverName}..."), cancellationToken);
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Starting onboarding process for {newJoiner}..."), cancellationToken);
                 await turnContext.SendActivityAsync(CreateTypingActivity(turnContext), cancellationToken);
                 await Task.Delay(200);
-                await turnContext.SendActivityAsync(MessageFactory.Text($"Sent a request to John Ingram, manager of {leaverName}, to approve offboarding"), cancellationToken);
+                await turnContext.SendActivityAsync(MessageFactory.Text($"Sent a request to John Ingram, manager of {newJoiner}, to approve onboarding"), cancellationToken);
             }
             else if (text.StartsWith("closeticket"))
             {
@@ -315,7 +346,7 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
 
                 await turnContext.SendActivityAsync(MessageFactory.Attachment(card), cancellationToken);
 
-                await Task.Delay(1000);
+                await Task.Delay(2000);
                 var actionCard = ConnectorController.CreateSelectedTicketActionCard();
                 if (actionCard != null)
                 {
@@ -701,6 +732,45 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                 
             };
         }
+
+        private Attachment CreateVpnHealthCard()
+        {
+            var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
+            {
+                Body = new List<AdaptiveElement>
+                {
+                    new AdaptiveContainer
+                    {
+                        Items = new List<AdaptiveElement>
+                        {
+                            new AdaptiveTextBlock("VPN Server Health Report")
+                            {
+                                Weight = AdaptiveTextWeight.Bolder, 
+                                Size = AdaptiveTextSize.Large
+                            },
+                            new AdaptiveFactSet
+                            {
+                                Facts = new List<AdaptiveFact>
+                                {
+                                    new AdaptiveFact("CPU", "83%"),
+                                    new AdaptiveFact("Memory:", "58%"),
+                                    new AdaptiveFact("Network (Send):", "8.1 Gbps"),
+                                    new AdaptiveFact("Network (Receive):", "759.3 Mbps"),
+                                }
+                            },
+                        }
+                    },
+                }
+            };
+
+
+            return new Attachment
+            {
+                ContentType = AdaptiveCard.ContentType,
+                Content = card,
+                
+            };
+        }
         private Attachment CreateTicketCloseCard()
         {
             var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
@@ -713,8 +783,6 @@ namespace Microsoft.Teams.Samples.HelloWorld.Web
                         {
                             new AdaptiveTextBlock("Do you want to close the ticket?")
                             {
-                                Weight = AdaptiveTextWeight.Bolder, 
-                                Size = AdaptiveTextSize.Large
                             },
                         }
                     },
